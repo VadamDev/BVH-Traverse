@@ -18,7 +18,7 @@ BVH_MAX_DEPTH = 10
 class Globals:
     bvh: BoundingVolumeHierarchy = None
     visibleDepth: int = 0
-    renderMode: int = 0
+    renderMode: int = 1
 
 def main():
     pygame.init()
@@ -102,21 +102,27 @@ def onKeyPressed(key: int):
     elif key == pygame.K_KP_1 and Globals.renderMode != 0:
         Globals.renderMode = 0
 
-        print(f"Switched to render mode: {Globals.renderMode}")
+        print("Switched to render mode: ALL NODES")
     elif key == pygame.K_KP_2 and Globals.renderMode != 1:
         Globals.renderMode = 1
 
-        print(f"Switched to render mode: {Globals.renderMode}")
+        print("Switched to render mode: LEAF NODES")
 
 # Recursively draw each node bounding box, and draw leaf nodes as red
 def drawNode(screen: pygame.Surface, node: Node, depth = 0):
     if depth > Globals.visibleDepth or not node:
         return
 
+    # Show LEAF nodes in purple if current depth != Globals.visibleDepth
+    # Show LEAF nodes in red
+    # Other nodes in white -> black
     color = [255, 0, 0]
-    if depth != Globals.visibleDepth and not node.isLeaf():
-        luminance = max(0.05, min(0.8, 1 - depth / BVH_MAX_DEPTH)) * 255
-        color = [luminance, luminance , luminance]
+    if depth != Globals.visibleDepth:
+        if node.isLeaf():
+            color = "purple"
+        else:
+            luminance = max(0.05, min(0.8, 1 - depth / BVH_MAX_DEPTH)) * 255
+            color = [luminance, luminance, luminance]
 
     bb = node.boundingBox
     pygame.draw.rect(screen, color, [bb.boxMin.x, bb.boxMin.y, bb.boxMax.x - bb.boxMin.x, bb.boxMax.y - bb.boxMin.y],2)
