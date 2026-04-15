@@ -11,7 +11,12 @@
 *This project is part of [my C++ software raytracer](https://github.com/VadamDev/raytracing) and has been made for debug purposes.*
 
 ## Gallery
-TBD
+<p align="center">
+  <img src="gallery/leaf_nodes.jpg" width="45%" />
+  <img src="gallery/all_nodes.jpg" width="45%" />
+  
+  <img src="gallery/all_nodes_anim.gif" width="60%" />
+</p>
 
 ## Dependencies
 - [pygame](https://www.pygame.org/)
