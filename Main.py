@@ -8,7 +8,7 @@ from Primitives import Triangle
 
 # Globals
 
-ALL_TRIANGLES_COUNT = 10000
+ALL_TRIANGLES_COUNT = 1000
 ALL_TRIANGLES = []
 
 BVH_MAX_DEPTH = 10
