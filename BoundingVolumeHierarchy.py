@@ -91,12 +91,13 @@ class BoundingVolumeHierarchy:
 
     # GPU friendly traverse bvh method
     # If you want to write this in GLSL, use an index pointer instead of the fancy python's pop method
-    def traverse(self, TRIANGLES: List[Triangle], pos: Vec3):
+    def traverse(self, TRIANGLES: List[Triangle], pos: Vec3, testedNodes: List[Node]):
         stack = [self.nodes[0]]
         result = -1
 
         while stack:
             node = stack.pop()
+            testedNodes.append(node)
 
             if not node.boundingBox.intersect(pos):
                 continue

@@ -8,7 +8,7 @@ from Primitives import Triangle
 
 # Globals
 
-ALL_TRIANGLES_COUNT = 1000
+ALL_TRIANGLES_COUNT = 1500
 ALL_TRIANGLES = []
 
 BVH_MAX_DEPTH = 10
@@ -18,13 +18,18 @@ BVH_MAX_DEPTH = 10
 class Globals:
     bvh: BoundingVolumeHierarchy = None
     visibleDepth: int = 0
-    renderMode: int = 1
+    renderMode: int = 2
+
+    internal_fps = 0
+    internal_drawLine = 0
 
 def main():
     pygame.init()
 
     screen = pygame.display.set_mode((1920, 1080))
     pygame.display.set_caption("BVH")
+
+    font = pygame.font.SysFont("Arial", 20, italic=True)
 
     clock = pygame.time.Clock()
     init()
@@ -39,14 +44,14 @@ def main():
                 onKeyPressed(event.key)
 
         screen.fill("black")
-        render(screen)
+        render(screen, font)
         pygame.display.flip()
 
         deltaTime = clock.tick() / 1000
 
         timer += deltaTime
         if timer >= 1:
-            print(f"FPS: {clock.get_fps():.0f}")
+            Globals.internal_fps = f"{clock.get_fps():.0f}"
             timer = 0
 
     pygame.quit()
@@ -61,7 +66,7 @@ def generateTriangles():
     width, height = pygame.display.get_window_size()
 
     for _ in range(ALL_TRIANGLES_COUNT):
-        xOffset = random.uniform(PADDING, width - (PADDING + TRI_SIZE))
+        xOffset = random.uniform(PADDING + 135, width - (PADDING + TRI_SIZE))
         yOffset = random.uniform(PADDING, height - (PADDING + TRI_SIZE))
 
         a = Vec3(random.uniform(0, TRI_SIZE) + xOffset, random.uniform(0, TRI_SIZE) + yOffset, 0)
@@ -79,6 +84,16 @@ def init():
     # Generate Triangles
     generateTriangles()
 
+def formatRenderMode():
+    if Globals.renderMode == 0:
+        return "ALL"
+    elif Globals.renderMode == 1:
+        return "LEAF"
+    elif Globals.renderMode == 2:
+        return "TESTED"
+
+    return "UNKNOWN"
+
 def onKeyPressed(key: int):
     # Regenerate triangles and bvh using R key
     if key == pygame.K_r:
@@ -90,26 +105,33 @@ def onKeyPressed(key: int):
         if Globals.visibleDepth > BVH_MAX_DEPTH:
             Globals.visibleDepth = 0
 
-        print(f"Visible Depth: {Globals.visibleDepth}")
     elif key == pygame.K_KP_MINUS:
         Globals.visibleDepth -= 1
 
         if Globals.visibleDepth < 0:
             Globals.visibleDepth = BVH_MAX_DEPTH
-
-        print(f"Visible Depth: {Globals.visibleDepth}")
     # BVH Nodes render mode
     elif key == pygame.K_KP_1 and Globals.renderMode != 0:
         Globals.renderMode = 0
 
-        print("Switched to render mode: ALL NODES")
     elif key == pygame.K_KP_2 and Globals.renderMode != 1:
         Globals.renderMode = 1
 
-        print("Switched to render mode: LEAF NODES")
+    elif key == pygame.K_KP_3 and Globals.renderMode != 2:
+        Globals.renderMode = 2
+
+def drawText(screen: pygame.Surface, font: pygame.font.Font, text: str):
+    txt = font.render(text, True, (255, 255, 255))
+    rect = txt.get_rect()
+
+    rect.x += 8
+    rect.y += 8 + font.size(text)[1] * Globals.internal_drawLine
+    Globals.internal_drawLine += 1
+
+    screen.blit(txt, rect)
 
 # Recursively draw each node bounding box, and draw leaf nodes as red
-def drawNode(screen: pygame.Surface, node: Node, depth = 0):
+def drawNodeRecurse(screen: pygame.Surface, node: Node, depth = 0):
     if depth > Globals.visibleDepth or not node:
         return
 
@@ -127,14 +149,15 @@ def drawNode(screen: pygame.Surface, node: Node, depth = 0):
     bb = node.boundingBox
     pygame.draw.rect(screen, color, [bb.boxMin.x, bb.boxMin.y, bb.boxMax.x - bb.boxMin.x, bb.boxMax.y - bb.boxMin.y],2)
 
-    drawNode(screen, Globals.bvh.nodes[node.childIndex], depth + 1)
-    drawNode(screen, Globals.bvh.nodes[node.childIndex + 1], depth + 1)
+    drawNodeRecurse(screen, Globals.bvh.nodes[node.childIndex], depth + 1)
+    drawNodeRecurse(screen, Globals.bvh.nodes[node.childIndex + 1], depth + 1)
 
-def render(screen: pygame.Surface):
+def render(screen: pygame.Surface, font: pygame.font.Font):
     # Traverse BVH and highlight hovered triangle
     mousePos = Vec3(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], 0)
 
-    triIdx = Globals.bvh.traverse(ALL_TRIANGLES, mousePos)
+    testedNodes = []
+    triIdx = Globals.bvh.traverse(ALL_TRIANGLES, mousePos, testedNodes)
     if triIdx != -1:
         tri = ALL_TRIANGLES[triIdx]
         pygame.draw.polygon(screen, "white", [(tri.a.x, tri.a.y), (tri.b.x, tri.b.y), (tri.c.x, tri.c.y)], 0)
@@ -145,7 +168,7 @@ def render(screen: pygame.Surface):
         pygame.draw.circle(screen, tri.color, (tri.centroid.x, tri.centroid.y), 3)
 
     if Globals.renderMode == 0: # Recursively draw each node bounding box
-        drawNode(screen, Globals.bvh.nodes[0])
+        drawNodeRecurse(screen, Globals.bvh.nodes[0])
     elif Globals.renderMode == 1: # Only draw leaf nodes, in red
         for node in Globals.bvh.nodes:
             if not node.isLeaf():
@@ -153,6 +176,54 @@ def render(screen: pygame.Surface):
 
             bb = node.boundingBox
             pygame.draw.rect(screen, "red", [bb.boxMin.x, bb.boxMin.y, bb.boxMax.x - bb.boxMin.x, bb.boxMax.y - bb.boxMin.y], 2)
+    elif Globals.renderMode == 2: # Render each tested nodes during BVH Traversal
+        for node in testedNodes:
+            bb = node.boundingBox
+            pygame.draw.rect(screen, "orange", [bb.boxMin.x, bb.boxMin.y, bb.boxMax.x - bb.boxMin.x, bb.boxMax.y - bb.boxMin.y], 2)
+
+    # Debug Info Text
+
+    Globals.internal_drawLine = 0
+    drawText(screen, font, "> FPS:")
+    drawText(screen, font, f"{Globals.internal_fps}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, "> BVH:")
+    drawText(screen, font, "Nodes:")
+    drawText(screen, font, f"{len(Globals.bvh.nodes)}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, "Triangle:")
+    drawText(screen, font, f"{ALL_TRIANGLES_COUNT}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, "Max Depth:")
+    drawText(screen, font, f"{BVH_MAX_DEPTH}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, "Tested Nodes:")
+    drawText(screen, font, f"{len(testedNodes)}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, "> INFO:")
+    drawText(screen, font, "Mouse XY:")
+    drawText(screen, font, f"{mousePos.x}, {mousePos.y}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, "Render Mode:")
+    drawText(screen, font, formatRenderMode())
+    if Globals.renderMode == 0:
+        drawText(screen, font, f"Depth: {Globals.visibleDepth}")
+
+    drawText(screen, font, " ")
+
+    drawText(screen, font, f"Hit: {triIdx != -1} {f'({triIdx})' if triIdx != -1 else ''}")
 
 if __name__ == '__main__':
     main()
